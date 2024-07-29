@@ -78,28 +78,43 @@
                     <minimizeJar>true</minimizeJar>
                     <!-- 重命名包名解决冲突 -->
                     <relocations>
-                        <relocation>
+                        <!--<relocation>
                             <pattern>org.apache.hadoop</pattern>
                             <shadedPattern>relocation.org.apache.hadoop</shadedPattern>
                         </relocation>
                         <relocation>
                             <pattern>org.apache.htrace</pattern>
                             <shadedPattern>relocation.org.apache.htrace</shadedPattern>
-                        </relocation>
+                        </relocation>-->
                     </relocations>
                 </configuration>
                 <executions>
                     <execution>
                         <configuration>
                             <filters>
+                                <!--<filter>
+                                    <artifact>org.apache.htrace:htrace-core</artifact>
+                                    <includes>
+                                        <include>**</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.apache.hadoop:hadoop-common</artifact>
+                                    <includes>
+                                        <include>**</include>
+                                    </includes>
+                                </filter>-->
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>META-INF/**</exclude>
+
                                         <exclude>support/**</exclude>
                                         <exclude>tables/**</exclude>
                                         <exclude>tpcds/**</exclude>
                                         <exclude>tpch/**</exclude>
+                                        <exclude>edu/**</exclude>
+
                                         <exclude>common-version-info.properties</exclude>
                                         <exclude>core-default.xml</exclude>
                                         <exclude>digesterRules.xml</exclude>
