@@ -61,6 +61,26 @@ public enum HbaseUtil implements Serializable, Closeable {
     private int timeout = 60;
     private RegexUtil regexUtil = RegexUtil.INSTANCE.build();
 
+    public interface ResultScannerCallback {
+        void execute(Map<String, String> row);
+    }
+
+    public abstract class ResultScannerRunnerCallback implements ResultScannerCallback {
+        private Boolean running = true;
+
+        public Boolean getRunning() {
+            return running;
+        }
+
+        public void setRunning(Boolean running) {
+            this.running = running;
+        }
+
+        public ResultScannerRunnerCallback() {
+            this.running = running;
+        }
+    }
+
     /**
      * 设置线程数量
      *

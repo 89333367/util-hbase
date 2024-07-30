@@ -19,4 +19,12 @@ public class TestHbaseUtil {
             log.info("{}", m);
         }
     }
+
+    @Test
+    void t002() {
+        String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
+        hbaseUtil.select(sql, null, row -> {
+            log.info("{}", row);
+        });
+    }
 }
