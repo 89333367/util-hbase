@@ -47,6 +47,79 @@ import java.util.*;
 public enum HbaseUtil implements Serializable, Closeable {
     INSTANCE;
     private Log log = LogFactory.get();
+
+    /**
+     * 获得工具类工厂
+     *
+     * @return
+     */
+    public static HbaseUtil builder() {
+        return INSTANCE;
+    }
+
+    /**
+     * 构建工具类
+     *
+     * @return
+     */
+    public HbaseUtil build() {
+        // 避免没有环境变量时报错
+        try {
+            if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
+                File workaround = new File(".");
+                new File(".".concat(File.separator).concat("bin")).mkdirs();
+                new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
+                System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            log.warn("{}", e);
+        }
+
+        if (configuration.get("zookeeper.znode.parent") == null) {
+            configuration.set("zookeeper.znode.parent", "/hbase");
+        }
+        configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
+        configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
+        configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
+        configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
+
+        try {
+            connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
+            log.info("创建 hbase 链接成功");
+        } catch (IOException e) {
+            log.error(e);
+            log.info("创建 hbase 链接失败");
+        }
+
+        aggregationClient = new AggregationClient(configuration);
+
+        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
+        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
+            canSetCaching = true;
+        }
+
+        return INSTANCE;
+    }
+
+    /**
+     * 释放资源
+     *
+     * @throws IOException
+     */
+    @Override
+    public void close() {
+        try {
+            aggregationClient.close();
+            log.info("关闭 aggregation 成功");
+        } catch (IOException e) {
+        }
+        try {
+            connection.close();
+            log.info("关闭 Hbase 链接成功");
+        } catch (IOException e) {
+        }
+    }
+
     public static final String FIRST_VISIBLE_ASCII = "!";// ascii 第一个可见字符
     public static final String LAST_VISIBLE_ASCII = "~";// ascii 最后一个可见字符
     public static final String ROW_KEY_NAME = "rowKey";// 默认返回rowKey的名称
@@ -59,7 +132,7 @@ public enum HbaseUtil implements Serializable, Closeable {
     private volatile boolean canSetCaching = false;// 表示是否能设置caching
     private int threadSize = 1;
     private int timeout = 60;
-    private RegexUtil regexUtil = RegexUtil.INSTANCE.build();
+    private RegexUtil regexUtil = RegexUtil.builder().build();
 
     public interface ResultScannerCallback {
         void execute(Map<String, String> row);
@@ -121,50 +194,6 @@ public enum HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil setZookeeperZnodeParent(String zookeeperZnodeParent) {
         configuration.set("zookeeper.znode.parent", zookeeperZnodeParent);
-        return INSTANCE;
-    }
-
-    /**
-     * 构建工具类
-     *
-     * @return
-     */
-    public HbaseUtil build() {
-        // 避免没有环境变量时报错
-        try {
-            if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
-                File workaround = new File(".");
-                new File(".".concat(File.separator).concat("bin")).mkdirs();
-                new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
-                System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
-            }
-        } catch (Exception e) {
-            log.warn("{}", e);
-        }
-
-        if (configuration.get("zookeeper.znode.parent") == null) {
-            configuration.set("zookeeper.znode.parent", "/hbase");
-        }
-        configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
-        configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
-        configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
-        configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
-
-        try {
-            connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
-            log.info("创建 hbase 链接成功");
-        } catch (IOException e) {
-            log.error(e);
-            log.info("创建 hbase 链接失败");
-        }
-
-        aggregationClient = new AggregationClient(configuration);
-
-        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
-        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
-            canSetCaching = true;
-        }
-
         return INSTANCE;
     }
 
@@ -928,22 +957,4 @@ public enum HbaseUtil implements Serializable, Closeable {
     }
 
 
-    /**
-     * 释放资源
-     *
-     * @throws IOException
-     */
-    @Override
-    public void close() {
-        try {
-            aggregationClient.close();
-            log.info("关闭 aggregation 成功");
-        } catch (IOException e) {
-        }
-        try {
-            connection.close();
-            log.info("关闭 Hbase 链接成功");
-        } catch (IOException e) {
-        }
-    }
 }

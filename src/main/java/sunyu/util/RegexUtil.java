@@ -32,12 +32,25 @@ public enum RegexUtil implements Serializable, Closeable {
     private Log log = LogFactory.get();
 
     /**
-     * 初始化
+     * 获得工具类工厂
+     *
+     * @return
+     */
+    public static RegexUtil builder() {
+        return INSTANCE;
+    }
+
+    /**
+     * 构建工具类
      *
      * @return
      */
     public RegexUtil build() {
         return INSTANCE;
+    }
+
+    @Override
+    public void close() {
     }
 
     /**
@@ -314,8 +327,5 @@ public enum RegexUtil implements Serializable, Closeable {
         return null;
     }
 
-    @Override
-    public void close() {
 
-    }
 }

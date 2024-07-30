@@ -10,7 +10,7 @@ import java.util.Map;
 
 public class TestHbaseUtil {
     Log log = LogFactory.get();
-    HbaseUtil hbaseUtil = HbaseUtil.INSTANCE.setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+    HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
 
     @Test
     void t001() {
