@@ -1,10 +1,18 @@
 # kafka工具类
 
-> 适用于 hbase 1.2.12 +
-> 
-> 适用于 jdk8+
+## 描述
 
-> 引入依赖
+* 可以用于建表/删表/修改表/禁用表/启用表/查询数据/统计行数/插入数据/更新数据/删除数据
+* 特殊变量：rowKey/startRowKey/stopRowKey
+* 注意：此工具类只适用于存储hbase都是字符串类型的数据查询
+
+## 环境
+
+* 适用于 hbase 1.2.12 及以上版本
+* 适用于 jdk8 x64 及以上版本
+
+## 引入依赖
+
 ```xml
 <dependency>
     <groupId>sunyu.util</groupId>
@@ -14,6 +22,7 @@
 ```
 
 ### 更多接口调用请看HbaseUtil.java源码
+
 ```java
 public class TestHbaseUtil {
     Log log = LogFactory.get();

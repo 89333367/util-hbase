@@ -63,6 +63,10 @@ public enum HbaseUtil implements Serializable, Closeable {
      * @return
      */
     public HbaseUtil build() {
+        if (connection != null) {
+            return INSTANCE;
+        }
+
         // 避免没有环境变量时报错
         try {
             if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
@@ -97,7 +101,6 @@ public enum HbaseUtil implements Serializable, Closeable {
         if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
             canSetCaching = true;
         }
-
         return INSTANCE;
     }
 
