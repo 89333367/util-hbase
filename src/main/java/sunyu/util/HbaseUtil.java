@@ -934,6 +934,7 @@ public class HbaseUtil implements Serializable, Closeable {
             log.info("创建 hbase 链接成功");
         } catch (Exception e) {
             log.error("创建 hbase 链接失败 {}", e.getMessage());
+            throw new RuntimeException("创建 hbase 链接失败");
         }
 
         log.info("创建统计协处理器开始");
