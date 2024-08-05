@@ -46,7 +46,6 @@ import java.util.*;
  */
 public class HbaseUtil implements Serializable, Closeable {
     private Log log = LogFactory.get();
-    private static final HbaseUtil INSTANCE = new HbaseUtil();
 
 
     public static final String FIRST_VISIBLE_ASCII = "!";// ascii 第一个可见字符
@@ -90,7 +89,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil setThreadSize(int threadSize) {
         this.threadSize = threadSize;
-        return INSTANCE;
+        return this;
     }
 
     /**
@@ -101,7 +100,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil setTimeout(int timeout) {
         this.timeout = timeout;
-        return INSTANCE;
+        return this;
     }
 
     /**
@@ -112,7 +111,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil setHbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
         configuration.set("hbase.zookeeper.quorum", hbaseZookeeperQuorum);
-        return INSTANCE;
+        return this;
     }
 
     /**
@@ -123,7 +122,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil setZookeeperZnodeParent(String zookeeperZnodeParent) {
         configuration.set("zookeeper.znode.parent", zookeeperZnodeParent);
-        return INSTANCE;
+        return this;
     }
 
 
@@ -898,7 +897,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @return
      */
     public static HbaseUtil builder() {
-        return INSTANCE;
+        return new HbaseUtil();
     }
 
     /**
@@ -908,7 +907,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public HbaseUtil build() {
         if (connection != null) {
-            return INSTANCE;
+            return this;
         }
 
         // 避免没有环境变量时报错
@@ -945,7 +944,7 @@ public class HbaseUtil implements Serializable, Closeable {
         if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
             canSetCaching = true;
         }
-        return INSTANCE;
+        return this;
     }
 
     /**
@@ -965,6 +964,12 @@ public class HbaseUtil implements Serializable, Closeable {
             log.info("关闭 Hbase 链接成功");
         } catch (IOException e) {
         }
+        connection = null;
+        aggregationClient = null;
+        configuration = HBaseConfiguration.create();
+        canSetCaching = false;
+        threadSize = 1;
+        timeout = 60;
     }
 
 
