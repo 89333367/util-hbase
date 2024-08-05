@@ -7,6 +7,7 @@ import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.*;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
+import cn.hutool.system.SystemUtil;
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLLimit;
@@ -63,23 +64,7 @@ public class HbaseUtil implements Serializable, Closeable {
     private RegexUtil regexUtil = RegexUtil.builder().build();
 
     public interface ResultScannerCallback {
-        void execute(Map<String, String> row);
-    }
-
-    public abstract class ResultScannerRunnerCallback implements ResultScannerCallback {
-        private volatile Boolean running = true;
-
-        public Boolean getRunning() {
-            return running;
-        }
-
-        public void setRunning(Boolean running) {
-            this.running = running;
-        }
-
-        public ResultScannerRunnerCallback() {
-            this.running = running;
-        }
+        void exec(Map<String, String> row) throws Exception;
     }
 
     /**
@@ -598,7 +583,6 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param returnColumnTimestamp 返回列的插入时间
      */
     public void select(String ql, String columnsCanMissing, ResultScannerCallback callback, Boolean returnColumnTimestamp) {
-        boolean isResultScannerRunnerCallback = callback instanceof ResultScannerRunnerCallback;
         log.debug("QL：{}", ql);
         List<String> columnCanMissingList = null;
         if (StrUtil.isNotBlank(columnsCanMissing)) {
@@ -724,8 +708,10 @@ public class HbaseUtil implements Serializable, Closeable {
                         }
                     }
                 }
-                callback.execute(row);
-                if (isResultScannerRunnerCallback && !((ResultScannerRunnerCallback) callback).getRunning()) {
+                try {
+                    callback.exec(row);
+                } catch (Exception e) {
+                    log.warn("{}", e.getMessage());
                     break;
                 }
                 if (++i == pageSize) {
@@ -903,25 +889,72 @@ public class HbaseUtil implements Serializable, Closeable {
     /**
      * 构建工具类
      *
+     * @param configuration
      * @return
      */
-    public HbaseUtil build() {
+    public HbaseUtil build(Configuration configuration) {
+        log.info("构建工具类开始");
         if (connection != null) {
             return this;
         }
 
         // 避免没有环境变量时报错
-        try {
-            if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
-                File workaround = new File(".");
-                new File(".".concat(File.separator).concat("bin")).mkdirs();
-                new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
-                System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
+        if (SystemUtil.getOsInfo().isWindows()) {
+            try {
+                if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
+                    File workaround = new File(".");
+                    new File(".".concat(File.separator).concat("bin")).mkdirs();
+                    new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
+                    System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
+                }
+            } catch (Exception e) {
+                log.warn("{}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("{}", e);
         }
 
+        if (configuration.get("zookeeper.znode.parent") == null) {
+            configuration.set("zookeeper.znode.parent", "/hbase");
+        }
+        if (configuration.get("hbase.rpc.timeout") == null) {
+            configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
+        }
+        if (configuration.get("hbase.rpc.shortoperation.timeout") == null) {
+            configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
+        }
+        if (configuration.get("hbase.client.scanner.timeout.period") == null) {
+            configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
+        }
+        if (configuration.get("hbase.client.operation.timeout") == null) {
+            configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
+        }
+
+        try {
+            log.info("创建 hbase 链接开始");
+            connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
+            log.info("创建 hbase 链接成功");
+        } catch (Exception e) {
+            log.error("创建 hbase 链接失败 {}", e.getMessage());
+        }
+
+        log.info("创建统计协处理器开始");
+        aggregationClient = new AggregationClient(configuration);
+        log.info("创建统计协处理器完毕");
+
+        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
+        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
+            log.info("标记Scan支持setCaching方法");
+            canSetCaching = true;
+        }
+        log.info("构建工具类完毕");
+        return this;
+    }
+
+    /**
+     * 构建工具类
+     *
+     * @return
+     */
+    public HbaseUtil build() {
         if (configuration.get("zookeeper.znode.parent") == null) {
             configuration.set("zookeeper.znode.parent", "/hbase");
         }
@@ -929,22 +962,7 @@ public class HbaseUtil implements Serializable, Closeable {
         configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
         configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
         configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
-
-        try {
-            connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
-            log.info("创建 hbase 链接成功");
-        } catch (IOException e) {
-            log.error(e);
-            log.info("创建 hbase 链接失败");
-        }
-
-        aggregationClient = new AggregationClient(configuration);
-
-        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
-        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
-            canSetCaching = true;
-        }
-        return this;
+        return build(configuration);
     }
 
     /**
@@ -954,15 +972,20 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     @Override
     public void close() {
+        log.info("销毁工具类开始");
         try {
+            log.info("关闭 aggregation 开始");
             aggregationClient.close();
             log.info("关闭 aggregation 成功");
-        } catch (IOException e) {
+        } catch (Exception e) {
+            log.warn("关闭 aggregation 失败 {}", e.getMessage());
         }
         try {
+            log.info("关闭 Hbase 链接开始");
             connection.close();
             log.info("关闭 Hbase 链接成功");
-        } catch (IOException e) {
+        } catch (Exception e) {
+            log.warn("关闭 Hbase 链接失败 {}", e.getMessage());
         }
         connection = null;
         aggregationClient = null;
@@ -970,6 +993,7 @@ public class HbaseUtil implements Serializable, Closeable {
         canSetCaching = false;
         threadSize = 1;
         timeout = 60;
+        log.info("销毁工具类完毕");
     }
 
 

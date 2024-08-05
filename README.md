@@ -14,6 +14,7 @@
 ## 引入依赖
 
 ```xml
+
 <dependency>
     <groupId>sunyu.util</groupId>
     <artifactId>util-hbase</artifactId>
@@ -41,6 +42,42 @@ public class TestHbaseUtil {
         String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         hbaseUtil.select(sql, null, row -> {
             log.info("{}", row);
+        });
+    }
+
+
+    @Test
+    void t003() {
+        String sql = "select count(*) from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
+        log.info("{}", hbaseUtil.count(sql));
+    }
+
+    @Test
+    void t004() {
+        String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
+        hbaseUtil.select(sql, null, row -> {
+            log.info("{}", row);
+        });
+    }
+
+    @Test
+    void t005() {
+        String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
+        hbaseUtil.select(sql, null, row -> {
+            log.info("{}", row);
+        }, true);
+    }
+
+    @Test
+    void t006() {
+        AtomicInteger i = new AtomicInteger();
+        String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
+        hbaseUtil.select(sql, null, row -> {
+            if (i.get() >= 10) {
+                throw new Exception("只要10条，后面数据不要了");
+            }
+            log.info("{}", row);
+            i.incrementAndGet();
         });
     }
 }
