@@ -27,31 +27,10 @@ import java.io.Serializable;
  * 当针对小数时，要多大考虑小数后面的非零数字的特性。
  * 当遇到负数时，转换为正数进行计算。
  */
-public enum RegexUtil implements Serializable, Closeable {
-    INSTANCE;
+public class RegexUtil implements Serializable, Closeable {
     private Log log = LogFactory.get();
+    private static final RegexUtil INSTANCE = new RegexUtil();
 
-    /**
-     * 获得工具类工厂
-     *
-     * @return
-     */
-    public static RegexUtil builder() {
-        return INSTANCE;
-    }
-
-    /**
-     * 构建工具类
-     *
-     * @return
-     */
-    public RegexUtil build() {
-        return INSTANCE;
-    }
-
-    @Override
-    public void close() {
-    }
 
     /**
      * 小于指定数字的正则表达式
@@ -325,6 +304,35 @@ public enum RegexUtil implements Serializable, Closeable {
             return split;
         }
         return null;
+    }
+
+
+    /**
+     * 私有构造，避免在外部实例化
+     */
+    private RegexUtil() {
+    }
+
+    /**
+     * 获得工具类工厂
+     *
+     * @return
+     */
+    public static RegexUtil builder() {
+        return INSTANCE;
+    }
+
+    /**
+     * 构建工具类
+     *
+     * @return
+     */
+    public RegexUtil build() {
+        return INSTANCE;
+    }
+
+    @Override
+    public void close() {
     }
 
 
