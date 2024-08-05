@@ -328,11 +328,15 @@ public class RegexUtil implements Serializable, Closeable {
      * @return
      */
     public RegexUtil build() {
+        log.info("工具类RegexUtil构建开始");
+        log.info("工具类RegexUtil构建结束");
         return INSTANCE;
     }
 
     @Override
     public void close() {
+        log.info("销毁工具类RegexUtil开始");
+        log.info("销毁工具类RegexUtil结束");
     }
 
 

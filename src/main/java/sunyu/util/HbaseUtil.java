@@ -893,13 +893,15 @@ public class HbaseUtil implements Serializable, Closeable {
      * @return
      */
     public HbaseUtil build(Configuration configuration) {
-        log.info("构建工具类开始");
+        log.info("构建工具类HbaseUtil开始");
         if (connection != null) {
+            log.warn("工具类HbaseUtil已构建，请不要重复构建");
             return this;
         }
 
         // 避免没有环境变量时报错
         if (SystemUtil.getOsInfo().isWindows()) {
+            log.info("windows设置环境变量开始");
             try {
                 if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
                     File workaround = new File(".");
@@ -907,6 +909,7 @@ public class HbaseUtil implements Serializable, Closeable {
                     new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
                     System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
                 }
+                log.info("windows设置环境变量结束");
             } catch (Exception e) {
                 log.warn("{}", e.getMessage());
             }
@@ -946,7 +949,7 @@ public class HbaseUtil implements Serializable, Closeable {
             log.info("标记Scan支持setCaching方法");
             canSetCaching = true;
         }
-        log.info("构建工具类完毕");
+        log.info("构建工具类HbaseUtil完毕");
         return this;
     }
 
