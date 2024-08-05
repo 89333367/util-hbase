@@ -80,5 +80,11 @@ public class TestHbaseUtil {
             i.incrementAndGet();
         });
     }
+
+    @Test
+    void t007() {
+        //程序关闭前，不再使用工具类了，调用close回收资源
+        hbaseUtil.close();
+    }
 }
 ```
