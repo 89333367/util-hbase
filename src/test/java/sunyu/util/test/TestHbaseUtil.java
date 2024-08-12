@@ -18,7 +18,7 @@ public class TestHbaseUtil {
     @Test
     void t001() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         List<Map<String, String>> l = hbaseUtil.select("select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'");
         for (Map<String, String> m : l) {
             log.info("{}", m);
@@ -28,7 +28,7 @@ public class TestHbaseUtil {
     @Test
     void t002() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         hbaseUtil.select(sql, null, row -> {
             log.info("{}", row);
@@ -39,7 +39,7 @@ public class TestHbaseUtil {
     @Test
     void t003() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         String sql = "select count(*) from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         log.info("{}", hbaseUtil.count(sql));
     }
@@ -47,7 +47,7 @@ public class TestHbaseUtil {
     @Test
     void t004() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         hbaseUtil.select(sql, null, row -> {
             log.info("{}", row);
@@ -57,7 +57,7 @@ public class TestHbaseUtil {
     @Test
     void t005() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         hbaseUtil.select(sql, null, row -> {
             log.info("{}", row);
@@ -67,7 +67,7 @@ public class TestHbaseUtil {
     @Test
     void t006() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         AtomicInteger i = new AtomicInteger();
         String sql = "select * from farm_can#can where startRowKey='zzlic272318_20200524155905' and stopRowKey='zzlic272318_20200524160930'";
         hbaseUtil.select(sql, null, row -> {
@@ -82,7 +82,7 @@ public class TestHbaseUtil {
     @Test
     void t007() {
         //工具类中全局只需要build一次
-        HbaseUtil hbaseUtil = HbaseUtil.builder().setHbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").setZookeeperZnodeParent("/hbase").build();
+        HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         //程序关闭前，不再使用工具类了，调用close回收资源
         hbaseUtil.close();
     }

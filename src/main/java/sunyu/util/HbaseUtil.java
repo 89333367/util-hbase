@@ -72,7 +72,7 @@ public class HbaseUtil implements Serializable, Closeable {
      *
      * @param threadSize
      */
-    public HbaseUtil setThreadSize(int threadSize) {
+    public HbaseUtil threadSize(int threadSize) {
         this.threadSize = threadSize;
         return this;
     }
@@ -83,7 +83,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param timeout
      * @return
      */
-    public HbaseUtil setTimeout(int timeout) {
+    public HbaseUtil timeout(int timeout) {
         this.timeout = timeout;
         return this;
     }
@@ -94,7 +94,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param hbaseZookeeperQuorum zookeeper地址
      * @return
      */
-    public HbaseUtil setHbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
+    public HbaseUtil hbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
         configuration.set("hbase.zookeeper.quorum", hbaseZookeeperQuorum);
         return this;
     }
@@ -105,7 +105,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param zookeeperZnodeParent znode路径
      * @return
      */
-    public HbaseUtil setZookeeperZnodeParent(String zookeeperZnodeParent) {
+    public HbaseUtil zookeeperZnodeParent(String zookeeperZnodeParent) {
         configuration.set("zookeeper.znode.parent", zookeeperZnodeParent);
         return this;
     }
