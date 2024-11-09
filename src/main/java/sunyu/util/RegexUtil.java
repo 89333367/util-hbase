@@ -28,7 +28,7 @@ import java.io.Serializable;
  * 当遇到负数时，转换为正数进行计算。
  */
 public class RegexUtil implements Serializable, Closeable {
-    private Log log = LogFactory.get();
+    private final Log log = LogFactory.get();
     private static final RegexUtil INSTANCE = new RegexUtil();
 
 

@@ -3,6 +3,7 @@ package sunyu.util;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateTime;
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.*;
 import cn.hutool.log.Log;
@@ -46,7 +47,7 @@ import java.util.*;
  * @author 孙宇
  */
 public class HbaseUtil implements Serializable, Closeable {
-    private Log log = LogFactory.get();
+    private final Log log = LogFactory.get();
 
 
     public static final String FIRST_VISIBLE_ASCII = "!";// ascii 第一个可见字符
@@ -61,7 +62,7 @@ public class HbaseUtil implements Serializable, Closeable {
     private volatile boolean canSetCaching = false;// 表示是否能设置caching
     private int threadSize = 1;
     private int timeout = 60;
-    private RegexUtil regexUtil = RegexUtil.builder().build();
+    private final RegexUtil regexUtil = RegexUtil.builder().build();
 
     public interface ResultScannerCallback {
         void exec(Map<String, String> row) throws Exception;
@@ -151,7 +152,7 @@ public class HbaseUtil implements Serializable, Closeable {
             admin.disableTable(TableName.valueOf(tableName));
             admin.deleteTable(TableName.valueOf(tableName));
         } catch (IOException e) {
-            log.error(e);
+            log.error("删除表出现异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -168,7 +169,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Admin admin = connection.getAdmin();) {
             exists = admin.tableExists(TableName.valueOf(tableName));
         } catch (IOException e) {
-            log.error(e);
+            log.error("判断表是否存在发生异常 {}", ExceptionUtil.stacktraceToString(e));
         }
         return exists;
     }
@@ -186,7 +187,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try {
             hTableDescriptor.addCoprocessor(COPROCESSOR);// 设置统计协处理器
         } catch (IOException e) {
-            log.error(e);
+            log.error("配置协处理器发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         hTableDescriptor.setCompactionEnabled(true);
@@ -204,7 +205,7 @@ public class HbaseUtil implements Serializable, Closeable {
                 admin.createTable(hTableDescriptor);
             }
         } catch (IOException e) {
-            log.error(e);
+            log.error("创建表发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -240,7 +241,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Admin admin = connection.getAdmin();) {
             admin.disableTable(TableName.valueOf(tableName));
         } catch (IOException e) {
-            log.error(e);
+            log.error("禁用表发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -255,7 +256,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Admin admin = connection.getAdmin();) {
             admin.enableTable(TableName.valueOf(tableName));
         } catch (IOException e) {
-            log.error(e);
+            log.error("启用表发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -295,7 +296,7 @@ public class HbaseUtil implements Serializable, Closeable {
             });
             admin.modifyTable(TableName.valueOf(tableName), hTableDescriptor);// 修改表
         } catch (IOException e) {
-            log.error(e);
+            log.error("修改表发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         } finally {
             enableTable(tableName);
@@ -313,7 +314,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Table table = connection.getTable(TableName.valueOf(tableName));) {
             table.delete(new Delete(Bytes.toBytes(rowKey)));
         } catch (IOException e) {
-            log.error(e);
+            log.error("删除一条记录发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -333,7 +334,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Table table = connection.getTable(TableName.valueOf(tableName));) {
             table.delete(deleteList);
         } catch (IOException e) {
-            log.error(e);
+            log.error("删除一批记录发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -357,7 +358,7 @@ public class HbaseUtil implements Serializable, Closeable {
         try (Table table = connection.getTable(TableName.valueOf(tableName));) {
             table.delete(del);
         } catch (IOException e) {
-            log.error(e);
+            log.error("删除指定列发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -397,7 +398,7 @@ public class HbaseUtil implements Serializable, Closeable {
             });
             table.put(puts);
         } catch (IOException e) {
-            log.error(e);
+            log.error("存入多条记录发生异常 {}", ExceptionUtil.stacktraceToString(e));
             return false;
         }
         return true;
@@ -495,7 +496,7 @@ public class HbaseUtil implements Serializable, Closeable {
             try {
                 return aggregationClient.rowCount(TableName.valueOf(tableName), new LongColumnInterpreter(), scan);
             } catch (Throwable throwable) {
-                log.error(throwable);
+                log.error("统计数量发生异常 {}", ExceptionUtil.stacktraceToString(throwable));
             }
         }
         return 0;
@@ -711,7 +712,7 @@ public class HbaseUtil implements Serializable, Closeable {
                 try {
                     callback.exec(row);
                 } catch (Exception e) {
-                    log.warn("{}", e.getMessage());
+                    log.warn("查询数据回调发生异常 {}", ExceptionUtil.stacktraceToString(e));
                     break;
                 }
                 if (++i == pageSize) {
@@ -719,7 +720,7 @@ public class HbaseUtil implements Serializable, Closeable {
                 }
             }
         } catch (Exception e) {
-            log.error(e);
+            log.error("查询数据发生异常 {}", ExceptionUtil.stacktraceToString(e));
         }
     }
 
@@ -936,7 +937,7 @@ public class HbaseUtil implements Serializable, Closeable {
             connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
             log.info("创建 hbase 链接成功");
         } catch (Exception e) {
-            log.error("创建 hbase 链接失败 {}", e.getMessage());
+            log.error("创建 hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
             throw new RuntimeException("创建 hbase 链接失败");
         }
 
@@ -982,21 +983,15 @@ public class HbaseUtil implements Serializable, Closeable {
             aggregationClient.close();
             log.info("关闭 aggregation 成功");
         } catch (Exception e) {
-            log.warn("关闭 aggregation 失败 {}", e.getMessage());
+            log.warn("关闭 aggregation 失败 {}", ExceptionUtil.stacktraceToString(e));
         }
         try {
             log.info("关闭 Hbase 链接开始");
             connection.close();
             log.info("关闭 Hbase 链接成功");
         } catch (Exception e) {
-            log.warn("关闭 Hbase 链接失败 {}", e.getMessage());
+            log.warn("关闭 Hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
         }
-        connection = null;
-        aggregationClient = null;
-        configuration = HBaseConfiguration.create();
-        canSetCaching = false;
-        threadSize = 1;
-        timeout = 60;
         log.info("销毁工具类完毕");
     }
 
