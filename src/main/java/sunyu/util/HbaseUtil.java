@@ -29,10 +29,8 @@ import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.*;
 
 /**
@@ -46,9 +44,9 @@ import java.util.*;
  *
  * @author 孙宇
  */
-public class HbaseUtil implements Serializable, Closeable {
+public class HbaseUtil implements AutoCloseable {
     private final Log log = LogFactory.get();
-
+    private final Config config;
 
     public static final String FIRST_VISIBLE_ASCII = "!";// ascii 第一个可见字符
     public static final String LAST_VISIBLE_ASCII = "~";// ascii 最后一个可见字符
@@ -56,61 +54,152 @@ public class HbaseUtil implements Serializable, Closeable {
     public static final String START_ROW_KEY_NAME = "startRowKey";
     public static final String STOP_ROW_KEY_NAME = "stopRowKey";
     public static final String COPROCESSOR = "org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
-    private Connection connection;// hbase链接
-    private AggregationClient aggregationClient;
-    private Configuration configuration = HBaseConfiguration.create();
-    private volatile boolean canSetCaching = false;// 表示是否能设置caching
-    private int threadSize = 1;
-    private int timeout = 60;
-    private final RegexUtil regexUtil = RegexUtil.builder().build();
 
-    public interface ResultScannerCallback {
-        void exec(Map<String, String> row) throws Exception;
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    private HbaseUtil(Config config) {
+        log.info("[构建HbaseUtil] 开始");
+
+        // 避免没有环境变量时报错
+        if (SystemUtil.getOsInfo().isWindows()) {
+            log.info("windows设置环境变量开始");
+            try {
+                if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
+                    File workaround = new File(".");
+                    new File(".".concat(File.separator).concat("bin")).mkdirs();
+                    new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
+                    System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
+                }
+                log.info("windows设置环境变量结束");
+            } catch (Exception e) {
+                log.warn("{}", e.getMessage());
+            }
+        }
+
+        if (config.configuration.get("zookeeper.znode.parent") == null) {
+            config.configuration.set("zookeeper.znode.parent", "/hbase");
+        }
+        if (config.configuration.get("hbase.rpc.timeout") == null) {
+            config.configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
+        }
+        if (config.configuration.get("hbase.rpc.shortoperation.timeout") == null) {
+            config.configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
+        }
+        if (config.configuration.get("hbase.client.scanner.timeout.period") == null) {
+            config.configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
+        }
+        if (config.configuration.get("hbase.client.operation.timeout") == null) {
+            config.configuration.set("hbase.client.operation.timeout", "" + config.timeout * 1000);
+        }
+
+        try {
+            log.info("创建 hbase 链接开始");
+            config.connection = ConnectionFactory.createConnection(config.configuration, ThreadUtil.newExecutor(config.threadSize));
+            log.info("创建 hbase 链接成功");
+        } catch (Exception e) {
+            log.error("创建 hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
+            throw new RuntimeException("创建 hbase 链接失败");
+        }
+
+        log.info("创建统计协处理器开始");
+        config.aggregationClient = new AggregationClient(config.configuration);
+        log.info("创建统计协处理器完毕");
+
+        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
+        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
+            log.info("标记Scan支持setCaching方法");
+            config.canSetCaching = true;
+        }
+        log.info("[构建HbaseUtil] 结束");
+
+        this.config = config;
+    }
+
+    private static class Config {
+        private Connection connection;// hbase链接
+        private AggregationClient aggregationClient;
+        private final Configuration configuration = HBaseConfiguration.create();
+        private volatile boolean canSetCaching = false;// 表示是否能设置caching
+        private int threadSize = 1;
+        private int timeout = 60;
+        private final RegexUtil regexUtil = RegexUtil.builder().build();
+    }
+
+    public static class Builder {
+        private final Config config = new Config();
+
+        public HbaseUtil build() {
+            return new HbaseUtil(config);
+        }
+
+        /**
+         * 设置线程数量
+         *
+         * @param threadSize
+         */
+        public Builder threadSize(int threadSize) {
+            config.threadSize = threadSize;
+            return this;
+        }
+
+        /**
+         * 设置超时时间(秒)
+         *
+         * @param timeout
+         * @return
+         */
+        public Builder timeout(int timeout) {
+            config.timeout = timeout;
+            return this;
+        }
+
+        /**
+         * 设置zookeeper地址
+         *
+         * @param hbaseZookeeperQuorum zookeeper地址
+         * @return
+         */
+        public Builder hbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
+            config.configuration.set("hbase.zookeeper.quorum", hbaseZookeeperQuorum);
+            return this;
+        }
+
+        /**
+         * 设置znode路径
+         *
+         * @param zookeeperZnodeParent znode路径
+         * @return
+         */
+        public Builder zookeeperZnodeParent(String zookeeperZnodeParent) {
+            config.configuration.set("zookeeper.znode.parent", zookeeperZnodeParent);
+            return this;
+        }
     }
 
     /**
-     * 设置线程数量
-     *
-     * @param threadSize
+     * 回收资源
      */
-    public HbaseUtil threadSize(int threadSize) {
-        this.threadSize = threadSize;
-        return this;
+    @Override
+    public void close() {
+        log.info("[销毁HbaseUtil] 开始");
+        try {
+            log.info("关闭 aggregation 开始");
+            config.aggregationClient.close();
+            log.info("关闭 aggregation 成功");
+        } catch (Exception e) {
+            log.warn("关闭 aggregation 失败 {}", ExceptionUtil.stacktraceToString(e));
+        }
+        try {
+            log.info("关闭 Hbase 链接开始");
+            config.connection.close();
+            log.info("关闭 Hbase 链接成功");
+        } catch (Exception e) {
+            log.warn("关闭 Hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
+        }
+        log.info("[销毁HbaseUtil] 结束");
     }
-
-    /**
-     * 设置超时时间(秒)
-     *
-     * @param timeout
-     * @return
-     */
-    public HbaseUtil timeout(int timeout) {
-        this.timeout = timeout;
-        return this;
-    }
-
-    /**
-     * 设置zookeeper地址
-     *
-     * @param hbaseZookeeperQuorum zookeeper地址
-     * @return
-     */
-    public HbaseUtil hbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
-        configuration.set("hbase.zookeeper.quorum", hbaseZookeeperQuorum);
-        return this;
-    }
-
-    /**
-     * 设置znode路径
-     *
-     * @param zookeeperZnodeParent znode路径
-     * @return
-     */
-    public HbaseUtil zookeeperZnodeParent(String zookeeperZnodeParent) {
-        configuration.set("zookeeper.znode.parent", zookeeperZnodeParent);
-        return this;
-    }
-
 
     /**
      * 把字符串最后一个字符的ascii向前挪一位
@@ -148,7 +237,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param tableName *表名
      */
     public boolean deleteTable(String tableName) {
-        try (Admin admin = connection.getAdmin();) {
+        try (Admin admin = config.connection.getAdmin();) {
             admin.disableTable(TableName.valueOf(tableName));
             admin.deleteTable(TableName.valueOf(tableName));
         } catch (IOException e) {
@@ -166,7 +255,7 @@ public class HbaseUtil implements Serializable, Closeable {
      */
     public boolean existsTable(String tableName) {
         boolean exists = false;
-        try (Admin admin = connection.getAdmin();) {
+        try (Admin admin = config.connection.getAdmin();) {
             exists = admin.tableExists(TableName.valueOf(tableName));
         } catch (IOException e) {
             log.error("判断表是否存在发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -198,7 +287,7 @@ public class HbaseUtil implements Serializable, Closeable {
             family.setTimeToLive(timeToLive);
         }
         hTableDescriptor.addFamily(family);
-        try (Admin admin = connection.getAdmin();) {
+        try (Admin admin = config.connection.getAdmin();) {
             if (splitKeyBytes != null) {
                 admin.createTable(hTableDescriptor, splitKeyBytes);
             } else {
@@ -238,7 +327,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param tableName *表名
      */
     public boolean disableTable(String tableName) {
-        try (Admin admin = connection.getAdmin();) {
+        try (Admin admin = config.connection.getAdmin();) {
             admin.disableTable(TableName.valueOf(tableName));
         } catch (IOException e) {
             log.error("禁用表发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -253,7 +342,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param tableName *表名
      */
     public boolean enableTable(String tableName) {
-        try (Admin admin = connection.getAdmin();) {
+        try (Admin admin = config.connection.getAdmin();) {
             admin.enableTable(TableName.valueOf(tableName));
         } catch (IOException e) {
             log.error("启用表发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -278,7 +367,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param timeToLive *列簇超时时间，单位秒
      */
     public boolean modifyTable(String tableName, Integer timeToLive) {
-        try (Admin admin = connection.getAdmin(); Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Admin admin = config.connection.getAdmin(); Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             disableTable(tableName);// 禁用表
             HTableDescriptor hTableDescriptor = table.getTableDescriptor();// 获得表描述
             if (!hTableDescriptor.getCoprocessors().contains(COPROCESSOR)) {
@@ -311,7 +400,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param rowKey    *行键
      */
     public boolean delete(String tableName, String rowKey) {
-        try (Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             table.delete(new Delete(Bytes.toBytes(rowKey)));
         } catch (IOException e) {
             log.error("删除一条记录发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -331,7 +420,7 @@ public class HbaseUtil implements Serializable, Closeable {
         for (String rowKey : rowKeyList) {
             deleteList.add(new Delete(Bytes.toBytes(rowKey)));
         }
-        try (Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             table.delete(deleteList);
         } catch (IOException e) {
             log.error("删除一批记录发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -355,7 +444,7 @@ public class HbaseUtil implements Serializable, Closeable {
             del.addColumn(Bytes.toBytes(familyName), Bytes.toBytes(column));
         });
 
-        try (Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             table.delete(del);
         } catch (IOException e) {
             log.error("删除指定列发生异常 {}", ExceptionUtil.stacktraceToString(e));
@@ -386,7 +475,7 @@ public class HbaseUtil implements Serializable, Closeable {
      * @param datas      *rowKey以及列信息；key：rowKey，value(map)：k:列名,v:列值
      */
     public boolean put(String tableName, String familyName, Map<String, Map<String, String>> datas) {
-        try (Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             byte[] familyNameByte = Bytes.toBytes(familyName);
             List<Put> puts = new ArrayList<>();
             datas.forEach((rowKey, columnInfo) -> {
@@ -494,7 +583,7 @@ public class HbaseUtil implements Serializable, Closeable {
             log.trace("{}", scan);
 
             try {
-                return aggregationClient.rowCount(TableName.valueOf(tableName), new LongColumnInterpreter(), scan);
+                return config.aggregationClient.rowCount(TableName.valueOf(tableName), new LongColumnInterpreter(), scan);
             } catch (Throwable throwable) {
                 log.error("统计数量发生异常 {}", ExceptionUtil.stacktraceToString(throwable));
             }
@@ -569,10 +658,10 @@ public class HbaseUtil implements Serializable, Closeable {
      *
      * @param ql
      * @param columnsCanMissing
-     * @param callback
+     * @param handler
      */
-    public void select(String ql, String columnsCanMissing, ResultScannerCallback callback) {
-        select(ql, columnsCanMissing, callback, null);
+    public void select(String ql, String columnsCanMissing, java.util.function.Consumer<Map<String, String>> handler) {
+        select(ql, columnsCanMissing, handler, null);
     }
 
     /**
@@ -580,10 +669,10 @@ public class HbaseUtil implements Serializable, Closeable {
      *
      * @param ql
      * @param columnsCanMissing
-     * @param callback              根据scanner回调
+     * @param handler               根据scanner回调
      * @param returnColumnTimestamp 返回列的插入时间
      */
-    public void select(String ql, String columnsCanMissing, ResultScannerCallback callback, Boolean returnColumnTimestamp) {
+    public void select(String ql, String columnsCanMissing, java.util.function.Consumer<Map<String, String>> handler, Boolean returnColumnTimestamp) {
         log.debug("QL：{}", ql);
         List<String> columnCanMissingList = null;
         if (StrUtil.isNotBlank(columnsCanMissing)) {
@@ -648,7 +737,7 @@ public class HbaseUtil implements Serializable, Closeable {
             if (limit != null) {
                 pageSize = Integer.parseInt(limit.getRowCount().toString());
                 log.trace("查询 {} 条", pageSize);
-                if (canSetCaching) {
+                if (config.canSetCaching) {
                     if (pageSize > 1000) {
                         scan.setCaching(1000);
                     } else {
@@ -688,7 +777,7 @@ public class HbaseUtil implements Serializable, Closeable {
 
         log.trace("{}", scan);
 
-        try (Table table = connection.getTable(TableName.valueOf(tableName));) {
+        try (Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             int i = 0;
             for (Result result : table.getScanner(scan)) {
                 Map<String, String> row = new HashMap<>();
@@ -710,7 +799,7 @@ public class HbaseUtil implements Serializable, Closeable {
                     }
                 }
                 try {
-                    callback.exec(row);
+                    handler.accept(row);
                 } catch (Exception e) {
                     log.warn("查询数据回调发生异常 {}", ExceptionUtil.stacktraceToString(e));
                     break;
@@ -815,7 +904,7 @@ public class HbaseUtil implements Serializable, Closeable {
                     }
                 } else {
                     if (NumberUtil.isNumber(columnValue)) {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regexUtil.transformEqualNumber(columnValue)));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
                     } else {
                         singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(columnValue));
                     }
@@ -830,7 +919,7 @@ public class HbaseUtil implements Serializable, Closeable {
                     }
                 } else {
                     if (NumberUtil.isNumber(columnValue)) {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new RegexStringComparator(regexUtil.transformEqualNumber(columnValue)));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
                     } else {
                         singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, Bytes.toBytes(columnValue));
                     }
@@ -848,13 +937,13 @@ public class HbaseUtil implements Serializable, Closeable {
                     singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new SubstringComparator(columnValue));
                 }
             } else if (operator == SQLBinaryOperator.GreaterThan) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regexUtil.transformGreaterNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformGreaterNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.GreaterThanOrEqual) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regexUtil.transformGreaterOrEqualNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformGreaterOrEqualNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.LessThan) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regexUtil.transformLessNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformLessNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.LessThanOrEqual) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regexUtil.transformLessOrEqualNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformLessOrEqualNumber(columnValue)));
             }
             if (singleColumnValueFilter != null) {
                 if (CollUtil.isNotEmpty(filterIfMissingColumnList) && filterIfMissingColumnList.contains(columnName)) {
@@ -870,130 +959,5 @@ public class HbaseUtil implements Serializable, Closeable {
         }
         log.trace("{}", scan);
     }
-
-
-    /**
-     * 私有构造，避免外部实例化
-     */
-    private HbaseUtil() {
-    }
-
-    /**
-     * 获得工具类工厂
-     *
-     * @return
-     */
-    public static HbaseUtil builder() {
-        return new HbaseUtil();
-    }
-
-    /**
-     * 构建工具类
-     *
-     * @param configuration
-     * @return
-     */
-    public HbaseUtil build(Configuration configuration) {
-        log.info("构建工具类HbaseUtil开始");
-        if (connection != null) {
-            log.warn("工具类HbaseUtil已构建，请不要重复构建");
-            return this;
-        }
-
-        // 避免没有环境变量时报错
-        if (SystemUtil.getOsInfo().isWindows()) {
-            log.info("windows设置环境变量开始");
-            try {
-                if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
-                    File workaround = new File(".");
-                    new File(".".concat(File.separator).concat("bin")).mkdirs();
-                    new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
-                    System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
-                }
-                log.info("windows设置环境变量结束");
-            } catch (Exception e) {
-                log.warn("{}", e.getMessage());
-            }
-        }
-
-        if (configuration.get("zookeeper.znode.parent") == null) {
-            configuration.set("zookeeper.znode.parent", "/hbase");
-        }
-        if (configuration.get("hbase.rpc.timeout") == null) {
-            configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
-        }
-        if (configuration.get("hbase.rpc.shortoperation.timeout") == null) {
-            configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
-        }
-        if (configuration.get("hbase.client.scanner.timeout.period") == null) {
-            configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
-        }
-        if (configuration.get("hbase.client.operation.timeout") == null) {
-            configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
-        }
-
-        try {
-            log.info("创建 hbase 链接开始");
-            connection = ConnectionFactory.createConnection(configuration, ThreadUtil.newExecutor(threadSize));
-            log.info("创建 hbase 链接成功");
-        } catch (Exception e) {
-            log.error("创建 hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
-            throw new RuntimeException("创建 hbase 链接失败");
-        }
-
-        log.info("创建统计协处理器开始");
-        aggregationClient = new AggregationClient(configuration);
-        log.info("创建统计协处理器完毕");
-
-        // 为了避免有些jar版本太低，导致setCaching方法不存在，这里先判断一下
-        if (ReflectUtil.getMethod(Scan.class, "setCaching") != null) {
-            log.info("标记Scan支持setCaching方法");
-            canSetCaching = true;
-        }
-        log.info("构建工具类HbaseUtil完毕");
-        return this;
-    }
-
-    /**
-     * 构建工具类
-     *
-     * @return
-     */
-    public HbaseUtil build() {
-        if (configuration.get("zookeeper.znode.parent") == null) {
-            configuration.set("zookeeper.znode.parent", "/hbase");
-        }
-        configuration.set("hbase.rpc.timeout", "" + 60000 * 10);
-        configuration.set("hbase.rpc.shortoperation.timeout", "" + 10000 * 10);
-        configuration.set("hbase.client.scanner.timeout.period", "" + 60000 * 10);
-        configuration.set("hbase.client.operation.timeout", "" + timeout * 1000);
-        return build(configuration);
-    }
-
-    /**
-     * 释放资源
-     *
-     * @throws IOException
-     */
-    @Override
-    public void close() {
-        log.info("销毁工具类开始");
-        try {
-            log.info("关闭 aggregation 开始");
-            aggregationClient.close();
-            log.info("关闭 aggregation 成功");
-        } catch (Exception e) {
-            log.warn("关闭 aggregation 失败 {}", ExceptionUtil.stacktraceToString(e));
-        }
-        try {
-            log.info("关闭 Hbase 链接开始");
-            connection.close();
-            log.info("关闭 Hbase 链接成功");
-        } catch (Exception e) {
-            log.warn("关闭 Hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
-        }
-        log.info("销毁工具类完毕");
-    }
-
 
 }

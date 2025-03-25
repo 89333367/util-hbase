@@ -5,9 +5,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
-import java.io.Closeable;
-import java.io.Serializable;
-
 /**
  * 根据输入数字，转换比较运算符的正则表达式
  *
@@ -27,13 +24,45 @@ import java.io.Serializable;
  * 当针对小数时，要多大考虑小数后面的非零数字的特性。
  * 当遇到负数时，转换为正数进行计算。
  */
-public class RegexUtil implements Serializable, Closeable {
+public class RegexUtil implements AutoCloseable {
     private final Log log = LogFactory.get();
-    private static final RegexUtil INSTANCE = new RegexUtil();
+    private final Config config;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    private RegexUtil(Config config) {
+        log.info("[构建RegexUtil] 开始");
+        log.info("[构建RegexUtil] 结束");
+        this.config = config;
+    }
+
+    private static class Config {
+    }
+
+    public static class Builder {
+        private final Config config = new Config();
+
+        public RegexUtil build() {
+            return new RegexUtil(config);
+        }
+    }
+
+    /**
+     * 回收资源
+     */
+    @Override
+    public void close() {
+        log.info("[销毁RegexUtil] 开始");
+        log.info("[销毁RegexUtil] 结束");
+    }
 
     /**
      * 小于指定数字的正则表达式
+     *
+     * @param s
+     * @return
      */
     public String transformLessNumber(String s) {
         StringBuilder sb = new StringBuilder();
@@ -68,6 +97,9 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 小于等于指定数字的正则表达式
+     *
+     * @param s
+     * @return
      */
     public String transformLessOrEqualNumber(String s) {
         StringBuilder sb = new StringBuilder();
@@ -104,6 +136,9 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 大于指定数字的正则表达式
+     *
+     * @param s
+     * @return
      */
     public String transformGreaterNumber(String s) {
         StringBuilder sb = new StringBuilder();
@@ -139,6 +174,9 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 大于或等于指定数字的正则表达式
+     *
+     * @param s
+     * @return
      */
     public String transformGreaterOrEqualNumber(String s) {
         StringBuilder sb = new StringBuilder();
@@ -176,6 +214,9 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 等于指定数字的正则表达式
+     *
+     * @param s
+     * @return
      */
     public String transformEqualNumber(String s) {
         String[] split = delZero(s.split("\\."));
@@ -192,6 +233,10 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 转换大于整数的正则表达式
+     *
+     * @param sign
+     * @param s
+     * @param sb
      */
     private void transformGreaterInteger(String sign, String s, StringBuilder sb) {
         //先添加高于给定数字位数的条件
@@ -213,6 +258,10 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 转换大于浮点类型数字的正则表达式
+     *
+     * @param sign
+     * @param split
+     * @param sb
      */
     private void transformGreaterDouble(String sign, String[] split, StringBuilder sb) {
         String s1 = split[0];
@@ -231,6 +280,10 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 转换小于整数的正则表达式
+     *
+     * @param sign
+     * @param s
+     * @param sb
      */
     private void transformLessInteger(String sign, String s, StringBuilder sb) {
         for (int i = 0; i < s.length(); i++) {
@@ -260,6 +313,10 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 转换小于浮点类型数字的正则表达式
+     *
+     * @param sign
+     * @param split
+     * @param sb
      */
     private void transformLessDouble(String sign, String[] split, StringBuilder sb) {
         String s1 = split[0];
@@ -290,6 +347,9 @@ public class RegexUtil implements Serializable, Closeable {
 
     /**
      * 去除数字小数点后，无效的0
+     *
+     * @param split
+     * @return
      */
     private String[] delZero(String[] split) {
         if (split.length == 1) {
@@ -305,39 +365,5 @@ public class RegexUtil implements Serializable, Closeable {
         }
         return null;
     }
-
-
-    /**
-     * 私有构造，避免在外部实例化
-     */
-    private RegexUtil() {
-    }
-
-    /**
-     * 获得工具类工厂
-     *
-     * @return
-     */
-    public static RegexUtil builder() {
-        return INSTANCE;
-    }
-
-    /**
-     * 构建工具类
-     *
-     * @return
-     */
-    public RegexUtil build() {
-        log.info("工具类RegexUtil构建开始");
-        log.info("工具类RegexUtil构建结束");
-        return INSTANCE;
-    }
-
-    @Override
-    public void close() {
-        log.info("销毁工具类RegexUtil开始");
-        log.info("销毁工具类RegexUtil结束");
-    }
-
 
 }
