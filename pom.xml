@@ -35,7 +35,7 @@
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>5.8.36</version>
+            <version>5.8.39</version>
         </dependency>
         <!-- https://central.sonatype.com/artifact/org.apache.hbase/hbase-shaded-client/versions -->
         <dependency>
@@ -53,19 +53,19 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid</artifactId>
-            <version>1.2.24</version>
+            <version>1.2.25</version>
         </dependency>
         <!-- https://central.sonatype.com/artifact/com.google.guava/guava/versions -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>33.4.5-jre</version>
+            <version>33.4.8-jre</version>
         </dependency>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter/versions -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.12.1</version>
+            <version>5.13.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -165,7 +165,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.2</version>
+                <version>3.5.3</version>
                 <configuration>
                     <skip>true</skip>
                 </configuration>
