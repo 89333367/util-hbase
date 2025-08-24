@@ -4,6 +4,7 @@ import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import org.junit.jupiter.api.Test;
 import sunyu.util.HbaseUtil;
+import sunyu.util.RegexUtil;
 
 import java.util.List;
 import java.util.Map;
@@ -84,6 +85,13 @@ public class TestHbaseUtil {
         HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("cdh0:2181,cdh1:2181,cdh2:2181").zookeeperZnodeParent("/hbase").build();
         //程序关闭前，不再使用工具类了，调用close回收资源
         hbaseUtil.close();
+    }
+
+    @Test
+    void t008() {
+        RegexUtil reg = RegexUtil.builder().build();
+        String s = reg.transformLessNumber("30");
+        log.info("{}", s);
     }
 
 }
