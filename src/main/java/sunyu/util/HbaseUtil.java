@@ -148,6 +148,7 @@ public class HbaseUtil implements AutoCloseable {
          * 设置超时时间(秒)
          *
          * @param timeout
+         *
          * @return
          */
         public Builder timeout(int timeout) {
@@ -159,6 +160,7 @@ public class HbaseUtil implements AutoCloseable {
          * 设置zookeeper地址
          *
          * @param hbaseZookeeperQuorum zookeeper地址
+         *
          * @return
          */
         public Builder hbaseZookeeperQuorum(String hbaseZookeeperQuorum) {
@@ -170,6 +172,7 @@ public class HbaseUtil implements AutoCloseable {
          * 设置znode路径
          *
          * @param zookeeperZnodeParent znode路径
+         *
          * @return
          */
         public Builder zookeeperZnodeParent(String zookeeperZnodeParent) {
@@ -205,6 +208,7 @@ public class HbaseUtil implements AutoCloseable {
      * 把字符串最后一个字符的ascii向前挪一位
      *
      * @param str 原字符串
+     *
      * @return 新字符串
      */
     public String lastCharAsciiSubOne(String str) {
@@ -220,6 +224,7 @@ public class HbaseUtil implements AutoCloseable {
      * 把字符串最后一个字符的ascii向后挪一位
      *
      * @param str 原字符串
+     *
      * @return 新字符串
      */
     public String lastCharAsciiAddOne(String str) {
@@ -251,6 +256,7 @@ public class HbaseUtil implements AutoCloseable {
      * 判断表是否存在
      *
      * @param tableName *表名
+     *
      * @return 表是否存在
      */
     public boolean existsTable(String tableName) {
@@ -436,6 +442,7 @@ public class HbaseUtil implements AutoCloseable {
      * @param familyName 列簇名
      * @param rowKey     rowKey
      * @param columns    删除列集合
+     *
      * @return
      */
     public boolean deleteColumns(String tableName, String familyName, String rowKey, List<String> columns) {
@@ -504,6 +511,7 @@ public class HbaseUtil implements AutoCloseable {
      * </pre>
      *
      * @param ql *查询语句
+     *
      * @return 匹配的行数
      */
     public long count(String ql) {
@@ -521,6 +529,7 @@ public class HbaseUtil implements AutoCloseable {
      *
      * @param ql                *查询语句
      * @param columnsCanMissing *默认where里的列必须存在，如果传递这个参数，则列可以不存在，英文半角逗号分隔
+     *
      * @return 匹配的行数
      */
     public long count(String ql, String columnsCanMissing) {
@@ -614,6 +623,7 @@ public class HbaseUtil implements AutoCloseable {
      * </pre>
      *
      * @param ql *查询语句
+     *
      * @return 结果集
      */
     public List<Map<String, String>> select(String ql) {
@@ -644,6 +654,7 @@ public class HbaseUtil implements AutoCloseable {
      *
      * @param ql                *查询语句
      * @param columnsCanMissing *默认where里的列必须存在，如果传递这个参数，则列可以不存在，英文半角逗号分隔
+     *
      * @return 结果集
      */
     public List<Map<String, String>> select(String ql, String columnsCanMissing) {
@@ -801,7 +812,7 @@ public class HbaseUtil implements AutoCloseable {
                 try {
                     handler.accept(row);
                 } catch (Exception e) {
-                    log.warn("查询数据回调发生异常 {}", ExceptionUtil.stacktraceToString(e));
+                    log.warn("数据回调处理发生异常 {}", ExceptionUtil.stacktraceToString(e));
                     break;
                 }
                 if (++i == pageSize) {
