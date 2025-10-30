@@ -26,15 +26,16 @@ import cn.hutool.log.LogFactory;
  */
 public class RegexUtil implements AutoCloseable {
     private final Log log = LogFactory.get();
-    private final Config config;
+    @SuppressWarnings("unused")
+    private Config config;
 
     public static Builder builder() {
         return new Builder();
     }
 
     private RegexUtil(Config config) {
-        log.info("[构建RegexUtil] 开始");
-        log.info("[构建RegexUtil] 结束");
+        log.info("[构建{}] 开始", this.getClass().getSimpleName());
+        log.info("[构建{}] 结束", this.getClass().getSimpleName());
         this.config = config;
     }
 
@@ -54,8 +55,8 @@ public class RegexUtil implements AutoCloseable {
      */
     @Override
     public void close() {
-        log.info("[销毁RegexUtil] 开始");
-        log.info("[销毁RegexUtil] 结束");
+        log.info("[销毁{}] 开始", this.getClass().getSimpleName());
+        log.info("[销毁{}] 结束", this.getClass().getSimpleName());
     }
 
     /**
@@ -273,7 +274,8 @@ public class RegexUtil implements AutoCloseable {
             int n = Integer.parseInt(s2.substring(i, i + 1));
             if (n != 9) {
                 String pre = s2.substring(0, i);
-                sb.append("|^").append(sign).append(s1).append("\\.").append(pre).append("[").append(n + 1).append("-9]\\d*$");
+                sb.append("|^").append(sign).append(s1).append("\\.").append(pre).append("[").append(n + 1)
+                        .append("-9]\\d*$");
             }
         }
     }
@@ -358,7 +360,7 @@ public class RegexUtil implements AutoCloseable {
             String s = split[1];
             int i = Integer.parseInt(StrUtil.reverse(s));
             if (i == 0) {
-                return new String[]{split[0]};
+                return new String[] { split[0] };
             }
             split[1] = StrUtil.reverse(String.valueOf(i));
             return split;

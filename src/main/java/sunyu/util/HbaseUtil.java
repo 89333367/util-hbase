@@ -1,14 +1,40 @@
 package sunyu.util;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DatePattern;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.exceptions.ExceptionUtil;
-import cn.hutool.core.thread.ThreadUtil;
-import cn.hutool.core.util.*;
-import cn.hutool.log.Log;
-import cn.hutool.log.LogFactory;
-import cn.hutool.system.SystemUtil;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.coprocessor.AggregationClient;
+import org.apache.hadoop.hbase.client.coprocessor.LongColumnInterpreter;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.RegexStringComparator;
+import org.apache.hadoop.hbase.filter.RowFilter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
+import org.apache.hadoop.hbase.filter.SubstringComparator;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.util.Bytes;
+
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLLimit;
@@ -18,20 +44,26 @@ import com.alibaba.druid.sql.ast.expr.SQLBinaryOpExpr;
 import com.alibaba.druid.sql.ast.expr.SQLBinaryOperator;
 import com.alibaba.druid.sql.ast.expr.SQLIdentifierExpr;
 import com.alibaba.druid.sql.ast.expr.SQLIntegerExpr;
-import com.alibaba.druid.sql.ast.statement.*;
+import com.alibaba.druid.sql.ast.statement.SQLSelectItem;
+import com.alibaba.druid.sql.ast.statement.SQLSelectQuery;
+import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
+import com.alibaba.druid.sql.ast.statement.SQLSelectStatement;
+import com.alibaba.druid.sql.ast.statement.SQLTableSource;
 import com.alibaba.druid.util.JdbcConstants;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.*;
-import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.client.coprocessor.AggregationClient;
-import org.apache.hadoop.hbase.client.coprocessor.LongColumnInterpreter;
-import org.apache.hadoop.hbase.filter.*;
-import org.apache.hadoop.hbase.io.compress.Compression;
-import org.apache.hadoop.hbase.util.Bytes;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DatePattern;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.exceptions.ExceptionUtil;
+import cn.hutool.core.thread.ThreadUtil;
+import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.util.NumberUtil;
+import cn.hutool.core.util.ReUtil;
+import cn.hutool.core.util.ReflectUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
+import cn.hutool.system.SystemUtil;
 
 /**
  * kafka生产者工具类
@@ -60,7 +92,7 @@ public class HbaseUtil implements AutoCloseable {
     }
 
     private HbaseUtil(Config config) {
-        log.info("[构建HbaseUtil] 开始");
+        log.info("[构建{}] 开始", this.getClass().getSimpleName());
 
         // 避免没有环境变量时报错
         if (SystemUtil.getOsInfo().isWindows()) {
@@ -69,7 +101,8 @@ public class HbaseUtil implements AutoCloseable {
                 if (StrUtil.isBlank(System.getProperty("hadoop.home.dir"))) {
                     File workaround = new File(".");
                     new File(".".concat(File.separator).concat("bin")).mkdirs();
-                    new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe")).createNewFile();
+                    new File(".".concat(File.separator).concat("bin").concat(File.separator).concat("winutils.exe"))
+                            .createNewFile();
                     System.setProperty("hadoop.home.dir", workaround.getAbsolutePath());
                 }
                 log.info("windows设置环境变量结束");
@@ -96,7 +129,8 @@ public class HbaseUtil implements AutoCloseable {
 
         try {
             log.info("创建 hbase 链接开始");
-            config.connection = ConnectionFactory.createConnection(config.configuration, ThreadUtil.newExecutor(config.threadSize));
+            config.connection = ConnectionFactory.createConnection(config.configuration,
+                    ThreadUtil.newExecutor(config.threadSize));
             log.info("创建 hbase 链接成功");
         } catch (Exception e) {
             log.error("创建 hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
@@ -112,7 +146,7 @@ public class HbaseUtil implements AutoCloseable {
             log.info("标记Scan支持setCaching方法");
             config.canSetCaching = true;
         }
-        log.info("[构建HbaseUtil] 结束");
+        log.info("[构建{}] 结束", this.getClass().getSimpleName());
 
         this.config = config;
     }
@@ -186,7 +220,7 @@ public class HbaseUtil implements AutoCloseable {
      */
     @Override
     public void close() {
-        log.info("[销毁HbaseUtil] 开始");
+        log.info("[销毁{}] 开始", this.getClass().getSimpleName());
         try {
             log.info("关闭 aggregation 开始");
             config.aggregationClient.close();
@@ -201,7 +235,7 @@ public class HbaseUtil implements AutoCloseable {
         } catch (Exception e) {
             log.warn("关闭 Hbase 链接失败 {}", ExceptionUtil.stacktraceToString(e));
         }
-        log.info("[销毁HbaseUtil] 结束");
+        log.info("[销毁{}] 结束", this.getClass().getSimpleName());
     }
 
     /**
@@ -373,7 +407,8 @@ public class HbaseUtil implements AutoCloseable {
      * @param timeToLive *列簇超时时间，单位秒
      */
     public boolean modifyTable(String tableName, Integer timeToLive) {
-        try (Admin admin = config.connection.getAdmin(); Table table = config.connection.getTable(TableName.valueOf(tableName));) {
+        try (Admin admin = config.connection.getAdmin();
+                Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             disableTable(tableName);// 禁用表
             HTableDescriptor hTableDescriptor = table.getTableDescriptor();// 获得表描述
             if (!hTableDescriptor.getCoprocessors().contains(COPROCESSOR)) {
@@ -488,7 +523,8 @@ public class HbaseUtil implements AutoCloseable {
             datas.forEach((rowKey, columnInfo) -> {
                 Put put = new Put(Bytes.toBytes(rowKey));
                 for (Map.Entry<String, String> infoEntry : columnInfo.entrySet()) {
-                    put.addColumn(familyNameByte, Bytes.toBytes(infoEntry.getKey()), Bytes.toBytes(infoEntry.getValue()));
+                    put.addColumn(familyNameByte, Bytes.toBytes(infoEntry.getKey()),
+                            Bytes.toBytes(infoEntry.getValue()));
                 }
                 puts.add(put);
             });
@@ -499,7 +535,6 @@ public class HbaseUtil implements AutoCloseable {
         }
         return true;
     }
-
 
     /**
      * 统计行数
@@ -592,7 +627,8 @@ public class HbaseUtil implements AutoCloseable {
             log.trace("{}", scan);
 
             try {
-                return config.aggregationClient.rowCount(TableName.valueOf(tableName), new LongColumnInterpreter(), scan);
+                return config.aggregationClient.rowCount(TableName.valueOf(tableName), new LongColumnInterpreter(),
+                        scan);
             } catch (Throwable throwable) {
                 log.error("统计数量发生异常 {}", ExceptionUtil.stacktraceToString(throwable));
             }
@@ -683,7 +719,8 @@ public class HbaseUtil implements AutoCloseable {
      * @param handler               根据scanner回调
      * @param returnColumnTimestamp 返回列的插入时间
      */
-    public void select(String ql, String columnsCanMissing, java.util.function.Consumer<Map<String, String>> handler, Boolean returnColumnTimestamp) {
+    public void select(String ql, String columnsCanMissing, java.util.function.Consumer<Map<String, String>> handler,
+            Boolean returnColumnTimestamp) {
         log.debug("QL：{}", ql);
         List<String> columnCanMissingList = null;
         if (StrUtil.isNotBlank(columnsCanMissing)) {
@@ -777,11 +814,13 @@ public class HbaseUtil implements AutoCloseable {
         if (StrUtil.isNotBlank(startRow) && StrUtil.isNotBlank(stopRow)) {
             if (scan.isReversed()) {
                 if (startRow.compareTo(stopRow) < 0) {
-                    throw new RuntimeException(StrUtil.format("逆序查询数据，startRowKey[{}]不能小于stopRowKey[{}]", startRow, stopRow));
+                    throw new RuntimeException(
+                            StrUtil.format("逆序查询数据，startRowKey[{}]不能小于stopRowKey[{}]", startRow, stopRow));
                 }
             } else {
                 if (startRow.compareTo(stopRow) > 0) {
-                    throw new RuntimeException(StrUtil.format("正序查询数据，startRowKey[{}]不能大于stopRowKey[{}]", startRow, stopRow));
+                    throw new RuntimeException(
+                            StrUtil.format("正序查询数据，startRowKey[{}]不能大于stopRowKey[{}]", startRow, stopRow));
                 }
             }
         }
@@ -801,7 +840,8 @@ public class HbaseUtil implements AutoCloseable {
                         if (!columnName.equals(ROW_KEY_NAME)) {
                             if (CollUtil.isEmpty(selectColumns) || selectColumns.contains(columnName)) {
                                 if (BooleanUtil.isTrue(returnColumnTimestamp)) {
-                                    row.put(columnName, new DateTime(timestamp).toString(DatePattern.NORM_DATETIME_MS_FORMAT));
+                                    row.put(columnName,
+                                            new DateTime(timestamp).toString(DatePattern.NORM_DATETIME_MS_FORMAT));
                                 } else {
                                     row.put(columnName, value);
                                 }
@@ -834,7 +874,8 @@ public class HbaseUtil implements AutoCloseable {
      * @param filterList
      * @param columnCanMissingList
      */
-    private void parseQl(byte[] familyNameBytes, Scan scan, boolean selectAllColumn, SQLExpr sqlExpr, FilterList filterList, List<String> columnCanMissingList) {
+    private void parseQl(byte[] familyNameBytes, Scan scan, boolean selectAllColumn, SQLExpr sqlExpr,
+            FilterList filterList, List<String> columnCanMissingList) {
         FilterList fl = filterList;
         SQLBinaryOpExpr expr = (SQLBinaryOpExpr) sqlExpr;
         SQLExpr left = expr.getLeft();
@@ -862,7 +903,8 @@ public class HbaseUtil implements AutoCloseable {
             parseQl(familyNameBytes, scan, selectAllColumn, left, fl, columnCanMissingList);
         }
         if (left instanceof SQLIdentifierExpr || left instanceof SQLIntegerExpr) {
-            addStartRowKeyAndStopRowKeyAndFilter(familyNameBytes, scan, selectAllColumn, left, operator, right, fl, columnCanMissingList);
+            addStartRowKeyAndStopRowKeyAndFilter(familyNameBytes, scan, selectAllColumn, left, operator, right, fl,
+                    columnCanMissingList);
         }
     }
 
@@ -877,7 +919,9 @@ public class HbaseUtil implements AutoCloseable {
      * @param right
      * @param filterIfMissingColumnList
      */
-    private void addStartRowKeyAndStopRowKeyAndFilter(byte[] familyNameBytes, Scan scan, boolean selectAllColumn, SQLExpr left, SQLBinaryOperator operator, SQLExpr right, FilterList filterList, List<String> filterIfMissingColumnList) {
+    private void addStartRowKeyAndStopRowKeyAndFilter(byte[] familyNameBytes, Scan scan, boolean selectAllColumn,
+            SQLExpr left, SQLBinaryOperator operator, SQLExpr right, FilterList filterList,
+            List<String> filterIfMissingColumnList) {
         String columnName = StrUtil.strip(left.toString(), "`");
         String columnValue = right.toString();
         String type = right.computeDataType().getName();
@@ -911,13 +955,18 @@ public class HbaseUtil implements AutoCloseable {
                     if (columnName.equals(ROW_KEY_NAME)) {
                         rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regex));
                     } else {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(regex));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL,
+                                new RegexStringComparator(regex));
                     }
                 } else {
                     if (NumberUtil.isNumber(columnValue)) {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL,
+                                new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
                     } else {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(columnValue));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(columnValue));
                     }
                 }
             } else if (operator == SQLBinaryOperator.NotEqual) {
@@ -926,35 +975,51 @@ public class HbaseUtil implements AutoCloseable {
                     if (columnName.equals(ROW_KEY_NAME)) {
                         rowFilter = new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, new RegexStringComparator(regex));
                     } else {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new RegexStringComparator(regex));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL,
+                                new RegexStringComparator(regex));
                     }
                 } else {
                     if (NumberUtil.isNumber(columnValue)) {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL,
+                                new RegexStringComparator(config.regexUtil.transformEqualNumber(columnValue)));
                     } else {
-                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, Bytes.toBytes(columnValue));
+                        singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes,
+                                Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL,
+                                Bytes.toBytes(columnValue));
                     }
                 }
             } else if (operator == SQLBinaryOperator.Like) {
                 if (columnName.equals(ROW_KEY_NAME)) {
                     rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new SubstringComparator(columnValue));
                 } else {
-                    singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new SubstringComparator(columnValue));
+                    singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                            CompareFilter.CompareOp.EQUAL, new SubstringComparator(columnValue));
                 }
             } else if (operator == SQLBinaryOperator.NotLike) {
                 if (columnName.equals(ROW_KEY_NAME)) {
                     rowFilter = new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, new SubstringComparator(columnValue));
                 } else {
-                    singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.NOT_EQUAL, new SubstringComparator(columnValue));
+                    singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                            CompareFilter.CompareOp.NOT_EQUAL, new SubstringComparator(columnValue));
                 }
             } else if (operator == SQLBinaryOperator.GreaterThan) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformGreaterNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                        CompareFilter.CompareOp.EQUAL,
+                        new RegexStringComparator(config.regexUtil.transformGreaterNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.GreaterThanOrEqual) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformGreaterOrEqualNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                        CompareFilter.CompareOp.EQUAL,
+                        new RegexStringComparator(config.regexUtil.transformGreaterOrEqualNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.LessThan) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformLessNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                        CompareFilter.CompareOp.EQUAL,
+                        new RegexStringComparator(config.regexUtil.transformLessNumber(columnValue)));
             } else if (operator == SQLBinaryOperator.LessThanOrEqual) {
-                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName), CompareFilter.CompareOp.EQUAL, new RegexStringComparator(config.regexUtil.transformLessOrEqualNumber(columnValue)));
+                singleColumnValueFilter = new SingleColumnValueFilter(familyNameBytes, Bytes.toBytes(columnName),
+                        CompareFilter.CompareOp.EQUAL,
+                        new RegexStringComparator(config.regexUtil.transformLessOrEqualNumber(columnValue)));
             }
             if (singleColumnValueFilter != null) {
                 if (CollUtil.isNotEmpty(filterIfMissingColumnList) && filterIfMissingColumnList.contains(columnName)) {
