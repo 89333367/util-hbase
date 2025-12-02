@@ -1,40 +1,14 @@
 package sunyu.util;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.ConnectionFactory;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.client.coprocessor.AggregationClient;
-import org.apache.hadoop.hbase.client.coprocessor.LongColumnInterpreter;
-import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.apache.hadoop.hbase.filter.FilterList;
-import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
-import org.apache.hadoop.hbase.filter.RegexStringComparator;
-import org.apache.hadoop.hbase.filter.RowFilter;
-import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
-import org.apache.hadoop.hbase.filter.SubstringComparator;
-import org.apache.hadoop.hbase.io.compress.Compression;
-import org.apache.hadoop.hbase.util.Bytes;
-
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DatePattern;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.exceptions.ExceptionUtil;
+import cn.hutool.core.thread.ThreadUtil;
+import cn.hutool.core.util.*;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
+import cn.hutool.system.SystemUtil;
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLLimit;
@@ -44,26 +18,20 @@ import com.alibaba.druid.sql.ast.expr.SQLBinaryOpExpr;
 import com.alibaba.druid.sql.ast.expr.SQLBinaryOperator;
 import com.alibaba.druid.sql.ast.expr.SQLIdentifierExpr;
 import com.alibaba.druid.sql.ast.expr.SQLIntegerExpr;
-import com.alibaba.druid.sql.ast.statement.SQLSelectItem;
-import com.alibaba.druid.sql.ast.statement.SQLSelectQuery;
-import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
-import com.alibaba.druid.sql.ast.statement.SQLSelectStatement;
-import com.alibaba.druid.sql.ast.statement.SQLTableSource;
+import com.alibaba.druid.sql.ast.statement.*;
 import com.alibaba.druid.util.JdbcConstants;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.client.coprocessor.AggregationClient;
+import org.apache.hadoop.hbase.client.coprocessor.LongColumnInterpreter;
+import org.apache.hadoop.hbase.filter.*;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.util.Bytes;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DatePattern;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.exceptions.ExceptionUtil;
-import cn.hutool.core.thread.ThreadUtil;
-import cn.hutool.core.util.BooleanUtil;
-import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.ReUtil;
-import cn.hutool.core.util.ReflectUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.log.Log;
-import cn.hutool.log.LogFactory;
-import cn.hutool.system.SystemUtil;
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * kafka生产者工具类
@@ -85,7 +53,22 @@ public class HbaseUtil implements AutoCloseable {
     public static final String ROW_KEY_NAME = "rowKey";// 默认返回rowKey的名称
     public static final String START_ROW_KEY_NAME = "startRowKey";
     public static final String STOP_ROW_KEY_NAME = "stopRowKey";
-    public static final String COPROCESSOR = "org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
+    // 根据类是否存在来判断是否使用了重定位的包
+    public static String COPROCESSOR;
+
+    static {
+        String originalClass = "org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
+        String relocatedClass = "sunyu.util.relocations.hbase.org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
+
+        // 尝试加载重定位后的类
+        try {
+            Class.forName(relocatedClass);
+            COPROCESSOR = relocatedClass;
+        } catch (ClassNotFoundException e) {
+            // 如果重定位的类不存在，使用原始类名
+            COPROCESSOR = originalClass;
+        }
+    }
 
     public static Builder builder() {
         return new Builder();
@@ -408,7 +391,7 @@ public class HbaseUtil implements AutoCloseable {
      */
     public boolean modifyTable(String tableName, Integer timeToLive) {
         try (Admin admin = config.connection.getAdmin();
-                Table table = config.connection.getTable(TableName.valueOf(tableName));) {
+             Table table = config.connection.getTable(TableName.valueOf(tableName));) {
             disableTable(tableName);// 禁用表
             HTableDescriptor hTableDescriptor = table.getTableDescriptor();// 获得表描述
             if (!hTableDescriptor.getCoprocessors().contains(COPROCESSOR)) {
@@ -720,7 +703,7 @@ public class HbaseUtil implements AutoCloseable {
      * @param returnColumnTimestamp 返回列的插入时间
      */
     public void select(String ql, String columnsCanMissing, java.util.function.Consumer<Map<String, String>> handler,
-            Boolean returnColumnTimestamp) {
+                       Boolean returnColumnTimestamp) {
         log.debug("QL：{}", ql);
         List<String> columnCanMissingList = null;
         if (StrUtil.isNotBlank(columnsCanMissing)) {
@@ -875,7 +858,7 @@ public class HbaseUtil implements AutoCloseable {
      * @param columnCanMissingList
      */
     private void parseQl(byte[] familyNameBytes, Scan scan, boolean selectAllColumn, SQLExpr sqlExpr,
-            FilterList filterList, List<String> columnCanMissingList) {
+                         FilterList filterList, List<String> columnCanMissingList) {
         FilterList fl = filterList;
         SQLBinaryOpExpr expr = (SQLBinaryOpExpr) sqlExpr;
         SQLExpr left = expr.getLeft();
@@ -920,8 +903,8 @@ public class HbaseUtil implements AutoCloseable {
      * @param filterIfMissingColumnList
      */
     private void addStartRowKeyAndStopRowKeyAndFilter(byte[] familyNameBytes, Scan scan, boolean selectAllColumn,
-            SQLExpr left, SQLBinaryOperator operator, SQLExpr right, FilterList filterList,
-            List<String> filterIfMissingColumnList) {
+                                                      SQLExpr left, SQLBinaryOperator operator, SQLExpr right, FilterList filterList,
+                                                      List<String> filterIfMissingColumnList) {
         String columnName = StrUtil.strip(left.toString(), "`");
         String columnValue = right.toString();
         String type = right.computeDataType().getName();

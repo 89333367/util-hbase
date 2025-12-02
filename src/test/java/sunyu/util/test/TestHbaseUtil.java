@@ -1,15 +1,14 @@
 package sunyu.util.test;
 
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
+import org.junit.jupiter.api.Test;
+import sunyu.util.HbaseUtil;
+import sunyu.util.RegexUtil;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.jupiter.api.Test;
-
-import cn.hutool.log.Log;
-import cn.hutool.log.LogFactory;
-import sunyu.util.HbaseUtil;
-import sunyu.util.RegexUtil;
 
 public class TestHbaseUtil {
     Log log = LogFactory.get();
@@ -20,7 +19,7 @@ public class TestHbaseUtil {
         HbaseUtil hbaseUtil = HbaseUtil.builder().hbaseZookeeperQuorum("kafka005:2181,kafka015:2181,kafka016:2181")
                 .zookeeperZnodeParent("/hbase").build();
         List<Map<String, String>> l = hbaseUtil.select(
-                "select * from can_ne#can where startRowKey='ffff7e52899bcc8a11d770af62f075ad_20220506104036' and stopRowKey='ffff7e52899bcc8a11d770af62f075ad_20221012113254' limit 10");
+                "select * from can_ne#can where startRowKey='ffff7e52899bcc8a11d770af62f075ad_20221012113110' and stopRowKey='ffff7e52899bcc8a11d770af62f075ad_20221012113254' limit 10");
         log.info("查询到数量 {}", l.size());
         for (Map<String, String> m : l) {
             log.info("{}", m);
