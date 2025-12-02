@@ -53,22 +53,7 @@ public class HbaseUtil implements AutoCloseable {
     public static final String ROW_KEY_NAME = "rowKey";// 默认返回rowKey的名称
     public static final String START_ROW_KEY_NAME = "startRowKey";
     public static final String STOP_ROW_KEY_NAME = "stopRowKey";
-    // 根据类是否存在来判断是否使用了重定位的包
-    public static String COPROCESSOR;
-
-    static {
-        String originalClass = "org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
-        String relocatedClass = "sunyu.util.relocations.hbase.org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
-
-        // 尝试加载重定位后的类
-        try {
-            Class.forName(relocatedClass);
-            COPROCESSOR = relocatedClass;
-        } catch (ClassNotFoundException e) {
-            // 如果重定位的类不存在，使用原始类名
-            COPROCESSOR = originalClass;
-        }
-    }
+    public static final String COPROCESSOR = "org.apache.hadoop.hbase.coprocessor.AggregateImplementation";
 
     public static Builder builder() {
         return new Builder();

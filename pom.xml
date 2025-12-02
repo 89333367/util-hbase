@@ -97,11 +97,6 @@
                                     <pattern>com.google</pattern>
                                     <shadedPattern>sunyu.util.relocations.hbase.com.google</shadedPattern>
                                 </relocation>
-                                <!-- 重命名Apache包 -->
-                                <relocation>
-                                    <pattern>org.apache</pattern>
-                                    <shadedPattern>sunyu.util.relocations.hbase.org.apache</shadedPattern>
-                                </relocation>
                             </relocations>
                             <transformers>
                                 <!-- 合并META-INF/services文件 -->
