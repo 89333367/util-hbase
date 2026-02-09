@@ -18,8 +18,8 @@
 <dependency>
     <groupId>sunyu.util</groupId>
     <artifactId>util-hbase</artifactId>
-    <!-- {hbase-shaded-client.version}_{util.version}_{jdk.version}_{architecture.version} -->
-    <version>1.2.12_1.0_jdk8_x64</version>
+    <!-- {hbase-shaded-client.version}_{util.version}_{jdk.version} -->
+    <version>1.2.12_2.0_jdk8</version>
     <classifier>shaded</classifier>
 </dependency>
 ```

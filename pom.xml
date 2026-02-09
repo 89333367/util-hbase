@@ -6,8 +6,8 @@
 
     <groupId>sunyu.util</groupId>
     <artifactId>util-hbase</artifactId>
-    <!-- {hbase-shaded-client.version}_{util.version}_{jdk.version}_{architecture.version} -->
-    <version>1.2.12_1.0_jdk8_x64</version>
+    <!-- {hbase-shaded-client.version}_{util.version}_{jdk.version} -->
+    <version>1.2.12_2.0_jdk8</version>
 
     <properties>
         <java.version>1.8</java.version>
@@ -35,25 +35,29 @@
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>5.8.42</version>
+            <version>5.8.43</version>
+            <optional>true</optional>
         </dependency>
         <!-- https://central.sonatype.com/artifact/org.apache.hbase/hbase-shaded-client/versions -->
         <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-shaded-client</artifactId>
             <version>1.2.12</version>
+            <optional>true</optional>
         </dependency>
         <!-- https://central.sonatype.com/artifact/com.alibaba/druid/versions -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid</artifactId>
             <version>1.2.27</version>
+            <optional>true</optional>
         </dependency>
         <!-- https://central.sonatype.com/artifact/com.google.guava/guava/versions -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>33.5.0-jre</version>
+            <optional>true</optional>
         </dependency>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter/versions -->
         <dependency>
@@ -81,36 +85,99 @@
                         <configuration>
                             <!-- 禁用 dependency-reduced-pom.xml 文件生成 -->
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- 重命名包：拆分多个relocation，每个指定明确的源pattern -->
                             <relocations>
-                                <!-- 重命名Hutool包 -->
+                                <!-- Apache 相关包 -->
                                 <relocation>
-                                    <pattern>cn.hutool</pattern>
-                                    <shadedPattern>sunyu.util.relocations.hbase.cn.hutool</shadedPattern>
+                                    <pattern>org.apache</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.apache</shadedPattern>
                                 </relocation>
-                                <!-- 重命名fastjson包 -->
+                                <!-- SLF4J 相关包 -->
                                 <relocation>
-                                    <pattern>com.alibaba</pattern>
-                                    <shadedPattern>sunyu.util.relocations.hbase.com.alibaba</shadedPattern>
+                                    <pattern>org.slf4j</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.slf4j</shadedPattern>
                                 </relocation>
-                                <!-- 重命名Google包 -->
+                                <!-- Spring 相关包 -->
+                                <relocation>
+                                    <pattern>org.springframework</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.springframework</shadedPattern>
+                                </relocation>
+                                <!-- JUnit 相关包 -->
+                                <relocation>
+                                    <pattern>org.junit</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.junit</shadedPattern>
+                                </relocation>
+                                <!-- LatencyUtils 相关包 -->
+                                <relocation>
+                                    <pattern>org.latencyutils</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.latencyutils</shadedPattern>
+                                </relocation>
+                                <!-- HDRHistogram 相关包 -->
+                                <relocation>
+                                    <pattern>org.hdrhistogram</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.hdrhistogram</shadedPattern>
+                                </relocation>
+                                <!-- JetBrains 相关包 -->
+                                <relocation>
+                                    <pattern>org.jetbrains</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.org.jetbrains</shadedPattern>
+                                </relocation>
+                                <!-- FasterXML 相关包 -->
+                                <relocation>
+                                    <pattern>com.fasterxml</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.com.fasterxml</shadedPattern>
+                                </relocation>
+                                <!-- Google 相关包 -->
                                 <relocation>
                                     <pattern>com.google</pattern>
-                                    <shadedPattern>sunyu.util.relocations.hbase.com.google</shadedPattern>
+                                    <shadedPattern>relocations.${project.groupId}.com.google</shadedPattern>
+                                </relocation>
+                                <!-- Netty 相关包 -->
+                                <relocation>
+                                    <pattern>io.netty</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.io.netty</shadedPattern>
+                                </relocation>
+                                <!-- Reactor 相关包 -->
+                                <relocation>
+                                    <pattern>io.projectreactor</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.io.projectreactor</shadedPattern>
+                                </relocation>
+                                <!-- Zipkin 相关包 -->
+                                <relocation>
+                                    <pattern>io.zipkin</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.io.zipkin</shadedPattern>
+                                </relocation>
+                                <!-- ReactiveX 相关包 -->
+                                <relocation>
+                                    <pattern>io.reactivex</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.io.reactivex</shadedPattern>
+                                </relocation>
+                                <!-- Javax enterprise 相关包 -->
+                                <relocation>
+                                    <pattern>javax.enterprise</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.javax.enterprise</shadedPattern>
+                                </relocation>
+                                <!-- Javax inject 相关包 -->
+                                <relocation>
+                                    <pattern>javax.inject</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.javax.inject</shadedPattern>
+                                </relocation>
+                                <!-- Hutool 相关包 -->
+                                <relocation>
+                                    <pattern>cn.hutool</pattern>
+                                    <shadedPattern>relocations.${project.groupId}.cn.hutool</shadedPattern>
                                 </relocation>
                             </relocations>
                             <transformers>
-                                <!-- 合并META-INF/services文件 -->
+                                <!-- 合并META-INF/services文件（插件会自动根据relocation重写类名） -->
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                <!-- 处理Apache许可证 -->
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                                 <!-- 处理Apache的META-INF/DISCLAIMER文件 -->
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
                                     <resource>META-INF/DISCLAIMER</resource>
                                 </transformer>
-                                <!-- 设置多版本JAR支持，兼容Java 9+的多版本特性 -->
+                                <!-- 处理MANIFEST.MF文件 -->
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
@@ -128,9 +195,6 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
-                                        <!-- 排除重复的NOTICE文件 -->
-                                        <exclude>META-INF/NOTICE*</exclude>
-                                        <exclude>META-INF/LICENSE*</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
@@ -173,7 +237,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.1</version>
+                <version>3.15.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
